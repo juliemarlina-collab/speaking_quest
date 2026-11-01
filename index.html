@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="description" content="Crystal Quest 2: Speak &amp; Conquer - a 3D speaking-practice game for beginner English and emerging MUET speakers." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Crystal Quest 2: Speak &amp; Conquer</title>
+  <script src="js/lib/three.min.js"></script>
+  <script src="js/lib/GLTFLoader.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tailwind.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="relative w-full h-full overflow-hidden select-none">
+
+  <!-- 3D Three.js Viewport -->
+  <div id="game-canvas-container" title="Drag to rotate camera around your hero"></div>
+
+  <!-- FLOATING 3D HERO OVERHEAD CALLOUT ("SEE YOURSELF" BEACON) -->
+  <div id="hero-screen-tag" class="hidden absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full transition-transform duration-75">
+    <div class="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-amber-400 text-xs font-display font-bold text-amber-300 shadow-lg flex items-center gap-1 whitespace-nowrap">
+      <span>⭐</span>
+      <span id="hero-tag-name">YOU (Aiden)</span>
+      <span id="hero-tag-pose" class="text-cyan-300 text-[11px]">• Idle</span>
+    </div>
+  </div>
+
+  <!-- TOP GAMEPLAY HUD -->
+  <header id="hud-bar" class="hidden absolute top-0 left-0 right-0 z-20 p-2 sm:p-3 pointer-events-none flex flex-wrap items-center justify-between gap-2">
+    <!-- Left: Hero Avatar + Hearts + Level Badge -->
+    <div class="flex items-center gap-2.5 glass-panel rounded-2xl px-3 py-1.5 pointer-events-auto">
+      <button id="btn-hud-hero" type="button" title="Change Hero" class="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-amber-400 shrink-0 group focus:outline-none">
+        <img id="hud-hero-img" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Hero Portrait" class="w-full h-full object-cover" />
+        <span class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[11px] font-bold text-amber-200 transition">HERO</span>
+      </button>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <span id="hud-hero-name" class="font-display font-bold text-sm text-amber-300 tracking-wide">Aiden</span>
+          <span id="hud-level-badge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-emerald-200">Lv.1 Whispering Woods</span>
+        </div>
+        <!-- Hearts Row -->
+        <div id="hud-hearts" class="flex items-center gap-1 mt-0.5" aria-label="Player Hearts">
+          <span class="text-rose-500 text-base drop-shadow">❤️</span>
+          <span class="text-rose-500 text-base drop-shadow">❤️</span>
+          <span class="text-rose-500 text-base drop-shadow">❤️</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Collectibles & Listening Progress -->
+    <div class="flex items-center gap-2 sm:gap-3 glass-panel rounded-2xl px-3.5 py-1.5 pointer-events-auto">
+      <div class="flex items-center gap-1.5" title="Crystal Coins Collected">
+        <span class="text-lg">💎</span>
+        <div class="leading-tight">
+          <div class="text-[11px] uppercase tracking-wider text-purple-300 font-semibold">Coins</div>
+          <div id="hud-coins" class="font-display font-bold text-sm text-amber-300">0 / 20</div>
+        </div>
+      </div>
+      <div class="h-6 w-px bg-purple-400/30"></div>
+      <div class="flex items-center gap-1.5" title="Speaking missions completed">
+        <span class="text-lg">🎙️</span>
+        <div class="leading-tight">
+          <div class="text-[11px] uppercase tracking-wider text-cyan-300 font-semibold">Missions</div>
+          <div id="hud-listening" class="font-display font-bold text-sm text-cyan-200">0 / 5</div>
+        </div>
+      </div>
+      <div class="h-6 w-px bg-purple-400/30 hidden sm:block"></div>
+      <div class="hidden sm:flex items-center gap-1.5" title="Hidden Treasure Chests Found">
+        <span class="text-lg">🎁</span>
+        <div class="leading-tight">
+          <div class="text-[11px] uppercase tracking-wider text-amber-300 font-semibold">Chests</div>
+          <div id="hud-chests" class="font-display font-bold text-sm text-amber-200">0 / 1</div>
+        </div>
+      </div>
+      <div class="h-6 w-px bg-purple-400/30"></div>
+      <div class="flex items-center gap-1.5" title="Total Score">
+        <span class="text-lg">⭐</span>
+        <div class="leading-tight">
+          <div class="text-[11px] uppercase tracking-wider text-yellow-300 font-semibold">Score</div>
+          <div id="hud-score" class="font-display font-bold text-sm text-white">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Camera View Switcher, Self-Mirror Cam, Test Audio, World Switch & Pause -->
+    <div class="flex items-center gap-1.5 pointer-events-auto">
+      <button id="btn-hud-cam" type="button" class="crystal-btn glass-panel px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:text-white flex items-center gap-1" title="Switch Camera View (Close / Front Selfie / Orbit)">
+        <span>🎥</span><span id="label-cam-mode" class="hidden md:inline">Cam: Close</span>
+      </button>
+      <button id="btn-hud-webcam" type="button" class="crystal-btn glass-panel px-2.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white flex items-center gap-1" title="Show / hide Hero Mirror">
+        <span>🪞</span><span class="hidden lg:inline">Mirror</span>
+      </button>
+      <button id="btn-hud-map" type="button" class="crystal-btn glass-panel px-2.5 py-2 rounded-xl text-xs font-semibold text-purple-200 hover:text-white flex items-center gap-1" title="Switch World / Level">
+        <span>🗺️</span><span class="hidden md:inline">Worlds</span>
+      </button>
+      <button id="btn-hud-mute" type="button" class="crystal-btn glass-panel px-2.5 py-2 rounded-xl text-xs font-semibold text-cyan-200 hover:text-white" title="Toggle Sound & Music">
+        🔊
+      </button>
+      <button id="btn-hud-pause" type="button" class="crystal-btn glass-panel px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:text-white flex items-center gap-1" title="Pause Game (Esc)">
+        <span>⏸️</span><span class="hidden sm:inline">Pause</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- LIVE "SEE YOURSELF" HERO MIRROR & OPTIONAL WEBCAM PIP WIDGET -->
+  <aside id="self-mirror-card" class="hidden absolute top-20 left-3 z-20 glass-panel gold-border rounded-2xl p-2.5 w-44 sm:w-52 pointer-events-auto space-y-2 transition-all">
+    <div class="flex items-center justify-between text-xs font-bold">
+      <span class="text-amber-300 flex items-center gap-1">🪞 <span id="mirror-title">Hero Selfie Mirror</span></span>
+    </div>
+    <div class="relative w-full h-24 rounded-xl overflow-hidden bg-gradient-to-b from-sky-400/30 to-emerald-600/30 border border-purple-400/40 flex items-center justify-center">
+      <!-- Hero Live Portrait & Pose Status -->
+      <img id="mirror-hero-img" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Hero Live Mirror" class="w-20 h-20 rounded-xl object-cover border-2 border-amber-300 shadow-md transition-transform duration-200" />
+      <div id="mirror-pose-pill" class="absolute bottom-1 left-1 right-1 bg-slate-950/85 text-center text-[11px] font-bold text-emerald-300 py-0.5 rounded-md">
+        Pose: Ready to Explore ✨
+      </div>
+    </div>
+    <div class="flex items-center justify-between text-[11px] text-purple-200">
+      <span>Drag screen to orbit 360°</span>
+      <button id="btn-center-hero" type="button" class="text-amber-300 underline font-semibold">Center</button>
+    </div>
+  </aside>
+
+  <!-- OBJECTIVE BANNER / COMPASS HINT -->
+  <div id="hud-objective-wrap" class="hidden absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 z-10 pointer-events-none w-full max-w-md px-3">
+    <div class="glass-panel rounded-full px-4 py-1.5 text-center text-xs sm:text-sm font-medium text-purple-100 shadow-lg flex items-center justify-center gap-2">
+      <span id="hud-objective-icon" class="text-amber-300">✨</span>
+      <span id="hud-objective-text">Walk to the glowing Voice Crystal and Guardian ahead, then press E!</span>
+    </div>
+  </div>
+
+  <!-- INTERACTION PROMPT FLOATING PILL -->
+  <div id="interaction-prompt" class="hidden absolute bottom-28 sm:bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+    <button id="btn-interact-prompt" type="button" class="crystal-btn gold-border bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white font-display font-bold px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2.5 text-sm sm:text-base animate-bounce">
+      <span class="bg-amber-400 text-slate-950 font-extrabold px-2 py-0.5 rounded-md text-xs">E</span>
+      <span id="interaction-prompt-label">Speak with the Guardian</span>
+    </button>
+  </div>
+
+  <!-- MOBILE & TOUCH ON-SCREEN CONTROLS -->
+  <div id="touch-controls" class="hidden absolute bottom-3 left-3 right-3 z-20 pointer-events-none flex items-end justify-between">
+    <!-- Virtual Joystick / D-Pad -->
+    <div class="pointer-events-auto bg-slate-900/80 backdrop-blur-md border border-purple-400/50 rounded-3xl p-2 w-36 h-36 relative grid grid-cols-3 grid-rows-3 gap-1 shadow-xl">
+      <div></div>
+      <button type="button" data-dir="up" class="touch-dir-btn bg-purple-600/70 active:bg-amber-400 active:text-slate-950 rounded-xl flex items-center justify-center font-bold text-lg">▲</button>
+      <div></div>
+      <button type="button" data-dir="left" class="touch-dir-btn bg-purple-600/70 active:bg-amber-400 active:text-slate-950 rounded-xl flex items-center justify-center font-bold text-lg">◀</button>
+      <div class="flex items-center justify-center text-[11px] font-bold text-purple-200">MOVE</div>
+      <button type="button" data-dir="right" class="touch-dir-btn bg-purple-600/70 active:bg-amber-400 active:text-slate-950 rounded-xl flex items-center justify-center font-bold text-lg">▶</button>
+      <div></div>
+      <button type="button" data-dir="down" class="touch-dir-btn bg-purple-600/70 active:bg-amber-400 active:text-slate-950 rounded-xl flex items-center justify-center font-bold text-lg">▼</button>
+      <div></div>
+    </div>
+
+    <!-- Action Buttons (Interact + Jump) -->
+    <div class="pointer-events-auto flex items-end gap-2.5">
+      <button id="btn-touch-listen" type="button" class="crystal-btn w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-700 border-2 border-cyan-300 shadow-lg flex flex-col items-center justify-center text-white font-display font-bold">
+        <span class="text-xl leading-none">🎙️</span>
+        <span class="text-[11px] mt-0.5">TALK</span>
+      </button>
+      <button id="btn-touch-jump" type="button" class="crystal-btn w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-yellow-200 shadow-xl flex flex-col items-center justify-center text-slate-950 font-display font-extrabold">
+        <span class="text-xl leading-none">⬆️</span>
+        <span class="text-xs mt-0.5">JUMP</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN MENU OVERLAY (SEMI-TRANSPARENT SO YOU SEE THE SUNLIT 3D WORLD)   -->
+  <!-- ===================================================================== -->
+  <section id="modal-main-menu" class="absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/35 backdrop-blur-[3px]">
+    <div class="glass-panel gold-border rounded-3xl max-w-4xl w-full p-5 sm:p-7 max-h-[94vh] overflow-y-auto custom-scroll">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <!-- Left Column: Title, Story & Main Buttons -->
+        <div class="lg:col-span-7 space-y-4 text-center lg:text-left">
+          <div class="inline-flex flex-wrap items-center gap-2 px-3 py-1 rounded-full bg-purple-500/30 border border-purple-400/50 text-purple-100 text-xs font-semibold">
+            <span>🎙️ Beginner English • Emerging MUET speakers</span>
+            <span>•</span>
+            <span>9 speaking missions • PREP • 3D worlds</span>
+          </div>
+
+          <div>
+            <h1 class="font-display text-3xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 via-pink-300 to-cyan-300 bg-clip-text text-transparent drop-shadow">
+              CRYSTAL QUEST 2: SPEAK &amp; CONQUER
+            </h1>
+            <p class="text-xs sm:text-sm text-purple-100/95 mt-2 leading-relaxed">
+              <strong>The Lost Kingdom of Voices.</strong> The Voice Crystal has shattered into three shards. Explore three 3D lands, talk to the Guardians and <strong>speak</strong> to restore the shards. Choose your help (model, sentence starters, keywords or on your own), press Start and talk. Nobody scores your accent: you check your own answer.
+            </p>
+          </div>
+
+          <!-- Quick Audio Check Banner -->
+          <div class="bg-slate-900/90 border border-cyan-400/50 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="text-left">
+              <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <span>🎙️ Microphone check</span>
+              </div>
+              <div id="voice-engine-status" class="text-xs text-slate-300">Works best in Chrome or Edge (speech-to-text). Other browsers record your voice for playback, or you can type.</div>
+            </div>
+            <button id="btn-test-voice" type="button" class="crystal-btn px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-display font-extrabold text-xs shadow">
+              🎙️ Test microphone
+            </button>
+          </div>
+
+
+          <!-- Student details for the lecturer's results report -->
+          <div class="bg-slate-900/90 border border-amber-400/40 rounded-2xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+            <label class="text-xs font-semibold text-amber-300">Your name
+              <input id="input-student-name" type="text" maxlength="60" autocomplete="name" placeholder="e.g. Nur Aisyah" class="mt-1 w-full px-3 py-2 rounded-lg bg-slate-950 border border-purple-400/40 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400" />
+            </label>
+            <label class="text-xs font-semibold text-amber-300">Class / Programme
+              <input id="input-student-class" type="text" maxlength="40" placeholder="e.g. DUE50132 DEE5A" class="mt-1 w-full px-3 py-2 rounded-lg bg-slate-950 border border-purple-400/40 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400" />
+            </label>
+            <div class="sm:col-span-2 text-xs text-slate-400">Used only on this device for your results report (Copy / Download at the end of each world).</div>
+          </div>
+
+          <!-- Primary CTA Buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <button id="btn-menu-play" type="button" class="crystal-btn col-span-1 sm:col-span-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 text-slate-950 font-display font-extrabold text-lg shadow-xl flex items-center justify-center gap-2">
+              <span>⚔️</span>
+              <span id="label-play-btn">Play Adventure (Level 4)</span>
+            </button>
+            <button id="btn-menu-continue" type="button" class="crystal-btn py-2.5 px-4 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-300/50 text-white font-display font-bold text-sm flex items-center justify-center gap-2">
+              <span>▶️</span>
+              <span id="label-continue-btn">Continue Saved Quest</span>
+            </button>
+            <button id="btn-menu-heroes" type="button" class="crystal-btn py-2.5 px-4 rounded-xl bg-purple-700/90 hover:bg-purple-600 border border-purple-300/50 text-white font-display font-bold text-sm flex items-center justify-center gap-2">
+              <span>🧙‍♀️</span>
+              <span>Select Hero (4 Avatars)</span>
+            </button>
+            <button id="btn-menu-worlds" type="button" class="crystal-btn py-2.5 px-4 rounded-xl bg-indigo-700/90 hover:bg-indigo-600 border border-indigo-300/50 text-white font-display font-bold text-sm flex items-center justify-center gap-2">
+              <span>🗺️</span>
+              <span>Select World (3 Levels)</span>
+            </button>
+            <button id="btn-menu-howto" type="button" class="crystal-btn py-2.5 px-4 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-500/50 text-slate-100 font-display font-bold text-sm flex items-center justify-center gap-2">
+              <span>📖</span>
+              <span>How to Play &amp; Controls</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1 text-xs text-purple-200/90">
+            <button id="btn-menu-settings" type="button" class="underline hover:text-amber-300">⚙️ Audio &amp; Accessibility Settings</button>
+            <span>•</span>
+            <span id="menu-progress-summary">Saved Progress: 0 ⭐ | 0 Pts</span>
+          </div>
+        </div>
+
+        <!-- Right Column: Active Hero Card & World Preview -->
+        <div class="lg:col-span-5 bg-slate-900/85 border border-purple-400/40 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-300">Selected Adventurer</span>
+            <button id="btn-menu-swap-hero" type="button" class="text-xs text-cyan-300 hover:underline font-semibold">Change Hero →</button>
+          </div>
+          <div class="flex items-center gap-3.5 bg-slate-950/75 p-3 rounded-xl border border-purple-500/35">
+            <img id="menu-hero-img" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Selected Hero" class="w-16 h-16 rounded-xl object-cover border-2 border-amber-400 shrink-0" />
+            <div>
+              <h2 id="menu-hero-title" class="font-display font-bold text-base text-white">Aiden — The Young Adventurer</h2>
+              <p id="menu-hero-desc" class="text-xs text-purple-200 mt-0.5">Brave, enthusiastic and adventurous. Trail: Golden sparkles ✨</p>
+            </div>
+          </div>
+
+          <!-- 3 Worlds Mini Status -->
+          <div class="space-y-1.5 pt-1">
+            <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Three Enchanted Worlds</div>
+            <div id="menu-worlds-list" class="space-y-1.5 text-xs"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- CHARACTER SELECTION MODAL (4 PLAYABLE AVATARS)                        -->
+  <!-- ===================================================================== -->
+  <section id="modal-heroes" class="hidden absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/65 backdrop-blur-md">
+    <div class="glass-panel gold-border rounded-3xl max-w-4xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto custom-scroll space-y-4">
+      <div class="flex items-center justify-between border-b border-purple-400/30 pb-3">
+        <div>
+          <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-amber-300">Choose Your Adventurer</h2>
+          <p class="text-xs sm:text-sm text-purple-200">All four heroes have equal speed, jump height, and abilities — pick your favorite style!</p>
+        </div>
+        <button id="btn-close-heroes" type="button" class="crystal-btn px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold text-slate-200">✕ Close</button>
+      </div>
+
+      <!-- 4 Equal Character Cards -->
+      <div id="hero-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
+
+      <div class="flex justify-end pt-2">
+        <button id="btn-confirm-hero" type="button" class="crystal-btn px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 font-display font-extrabold text-sm shadow-lg">
+          Confirm Hero &amp; Continue
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- WORLD / LEVEL SELECTION MODAL (3 LEVELS)                              -->
+  <!-- ===================================================================== -->
+  <section id="modal-worlds" class="hidden absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/65 backdrop-blur-md">
+    <div class="glass-panel gold-border rounded-3xl max-w-4xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto custom-scroll space-y-4">
+      <div class="flex items-center justify-between border-b border-purple-400/30 pb-3">
+        <div>
+          <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-cyan-300">Select Enchanted World</h2>
+          <p class="text-xs sm:text-sm text-purple-200">Finish three speaking missions in each land to restore a Voice Crystal shard and open the portal.</p>
+        </div>
+        <button id="btn-close-worlds" type="button" class="crystal-btn px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold text-slate-200">✕ Close</button>
+      </div>
+
+      <div id="world-cards-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- SPEAKING MISSION PANEL (docked so the 3D Guardian stays visible)      -->
+  <!-- ===================================================================== -->
+  <section id="modal-speaking" class="hidden absolute inset-x-0 bottom-0 z-30 flex flex-col items-center justify-end p-2 sm:p-4 pointer-events-none" aria-label="Speaking mission">
+    <div id="sp-scroll" class="sp-panel glass-panel gold-border pointer-events-auto custom-scroll">
+      <!-- Header -->
+      <div class="sp-head">
+        <div class="sp-head-left">
+          <div class="sp-icon">🎙️</div>
+          <div class="min-w-0">
+            <div class="sp-tags"><span id="sp-badge" class="sp-badge">Mission</span><span id="sp-skill" class="sp-skill">Skill</span></div>
+            <h3 id="sp-title" class="font-display sp-title">Title</h3>
+            <div id="sp-guardian" class="sp-guardian">Guardian</div>
+          </div>
+        </div>
+        <button id="sp-close" type="button" class="sp-btn sp-btn-dark">Step Back</button>
+      </div>
+
+      <div id="sp-main">
+        <!-- Task -->
+        <div class="sp-card sp-task">
+          <p id="sp-prompt" class="sp-prompt">Prompt</p>
+          <div class="sp-row">
+            <button id="sp-hear" type="button" class="sp-btn sp-btn-soft sp-tts-btn">🔊 Hear the task</button>
+            <span id="sp-target" class="sp-target">🎯 Aim: 10–20 s</span>
+            <button id="sp-think" type="button" class="hidden sp-btn sp-btn-soft">⏳ Plan first</button>
+          </div>
+        </div>
+
+        <!-- PREP cards -->
+        <div id="sp-prep" class="hidden sp-prep"></div>
+
+        <!-- Support -->
+        <div class="sp-card">
+          <div class="sp-label">Choose your help</div>
+          <div id="sp-support-tabs" class="sp-tabs" role="group" aria-label="Support level">
+            <button type="button" data-mode="model">🎧 Model</button>
+            <button type="button" data-mode="starters">🧩 Starters</button>
+            <button type="button" data-mode="keywords">🔑 Keywords</button>
+            <button type="button" data-mode="independent">💪 On my own</button>
+          </div>
+          <div id="sp-support-box" class="sp-support-box"></div>
+        </div>
+
+        <!-- Speak -->
+        <div class="sp-card sp-speak">
+          <div class="sp-rec-row">
+            <button id="sp-rec" type="button" class="sp-rec"><span id="sp-rec-icon">🎙️</span><span id="sp-rec-label">Start speaking</span></button>
+            <div class="sp-timer">
+              <div class="sp-time-top"><span id="sp-time" class="font-display">0:00</span><span class="sp-time-hint">green = target time</span></div>
+              <div id="sp-time-zone-holder" class="sp-time-bar"><div class="sp-time-zone"></div><div id="sp-time-fill" class="sp-time-fill"></div></div>
+              <div id="sp-meter" class="hidden sp-meter"><div id="sp-meter-fill" class="sp-meter-fill"></div></div>
+            </div>
+          </div>
+          <div id="sp-live-wrap" class="hidden sp-live"><span class="sp-live-tag">LIVE</span> <span id="sp-live"></span></div>
+          <div id="sp-status" class="sp-status">Press Start, then speak.</div>
+          <button id="sp-type-btn" type="button" class="sp-linkbtn">⌨️ Can't use the microphone? Type instead</button>
+
+          <!-- One-time privacy notice -->
+          <div id="sp-consent" class="hidden sp-consent">
+            <div class="sp-consent-title">🔒 Before you speak</div>
+            <ul>
+              <li>Your browser will ask to use the <strong>microphone</strong>.</li>
+              <li><strong>Speech-to-text</strong> (if your browser has it) may send your voice to the browser company (e.g. Google) to turn it into words.</li>
+              <li>Any <strong>recording stays on this device</strong> so you can listen back. It is not uploaded or saved.</li>
+              <li>The game never scores your accent or pronunciation.</li>
+            </ul>
+            <div class="sp-row">
+              <button id="sp-consent-ok" type="button" class="sp-btn sp-btn-go">OK, start speaking</button>
+              <button id="sp-consent-type" type="button" class="sp-btn sp-btn-dark">I'd rather type</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Check -->
+        <div id="sp-check" class="hidden sp-card sp-check-card">
+          <div class="sp-label">Check your answer <span id="sp-mode-label" class="sp-mode"></span></div>
+          <div id="sp-playback-wrap" class="hidden sp-row">
+            <span class="sp-note">▶ Listen to yourself:</span>
+            <audio id="sp-playback" controls></audio>
+          </div>
+          <textarea id="sp-transcript" rows="3" class="sp-transcript" placeholder="Your words appear here. You can fix mistakes."></textarea>
+          <div class="sp-row"><button id="sp-recheck" type="button" class="sp-linkbtn">🔄 Check my edited words again</button></div>
+          <div id="sp-checklist" class="sp-checklist"></div>
+          <div class="sp-done-row">
+            <div id="sp-stars" class="sp-stars"></div>
+            <div class="sp-row">
+              <button id="sp-again" type="button" class="sp-btn sp-btn-dark">🔁 Try again</button>
+              <button id="sp-done" type="button" class="sp-btn sp-btn-go" disabled>✅ Restore the crystal</button>
+            </div>
+          </div>
+          <div id="sp-done-hint" class="sp-note"></div>
+          <div class="sp-note sp-small">Stars come from your own checklist, never from your accent. The words in <em>green</em> were spotted in your answer; you decide.</div>
+        </div>
+      </div>
+
+      <!-- Bonus offer -->
+      <div id="sp-bonus-offer" class="hidden sp-card sp-bonus">
+        <div class="sp-label">⭐ Optional bonus</div>
+        <p id="sp-bonus-text" class="sp-prompt"></p>
+        <div class="sp-note">Reward: <strong id="sp-bonus-reward"></strong></div>
+        <div class="sp-row">
+          <button id="sp-bonus-go" type="button" class="sp-btn sp-btn-go">🎙️ Try the bonus</button>
+          <button id="sp-bonus-skip" type="button" class="sp-btn sp-btn-dark">No thanks, continue</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- HOW TO PLAY & CONTROLS MODAL                                          -->
+  <!-- ===================================================================== -->
+  <section id="modal-howto" class="hidden absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md">
+    <div class="glass-panel gold-border rounded-3xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto custom-scroll space-y-4">
+      <div class="flex items-center justify-between border-b border-purple-400/30 pb-3">
+        <h2 class="font-display text-2xl font-extrabold text-amber-300">How to Play &amp; Controls</h2>
+        <button id="btn-close-howto" type="button" class="crystal-btn px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold">✕ Close</button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+        <div class="bg-slate-900/80 p-4 rounded-2xl border border-purple-400/30 space-y-2">
+          <h3 class="font-display font-bold text-cyan-300 text-base">⌨️ Desktop &amp; Camera Controls</h3>
+          <ul class="space-y-1.5 text-slate-200">
+            <li><strong class="text-amber-300">W / A / S / D</strong> or <strong class="text-amber-300">Arrow Keys</strong>: Run &amp; steer hero</li>
+            <li><strong class="text-amber-300">Spacebar</strong>: Jump (bounce high on red mushrooms!)</li>
+            <li><strong class="text-amber-300">Drag Mouse</strong> or <strong class="text-amber-300">C Key</strong>: Orbit 360° / Switch Selfie Camera</li>
+            <li><strong class="text-amber-300">E Key</strong> / 🎙️ TALK: Speak with a Guardian</li>
+          </ul>
+        </div>
+        <div class="bg-slate-900/80 p-4 rounded-2xl border border-purple-400/30 space-y-2">
+          <h3 class="font-display font-bold text-pink-300 text-base">🪞 See Yourself &amp; Audio Features</h3>
+          <ul class="space-y-1.5 text-slate-200">
+            <li><strong class="text-amber-300">🎥 Cam Button</strong>: Switch between Close, Selfie Front, Action &amp; Top views</li>
+            <li><strong class="text-amber-300">🪞 Mirror</strong>: Show or hide your Hero Mirror card</li>
+            <li><strong class="text-amber-300">🎙️ Speaking</strong>: Hear the task, choose your help, press Start and speak. Press Stop, fix the words if needed, then tick your checklist.</li><li><strong class="text-amber-300">⌨️ No microphone?</strong> Type instead (marked as a typed answer).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-amber-400/30 space-y-2 text-xs sm:text-sm">
+        <h3 class="font-display font-bold text-amber-300 text-base">🏆 Scoring &amp; Star Rating Rules</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-slate-200">
+          <div>⭐ <strong>Meaningful attempt:</strong> 1 star</div>
+          <div>⭐ <strong>Reason / detail:</strong> +1 star</div>
+          <div>⭐ <strong>Target structure:</strong> +1 star (100 pts per star)</div>
+          <div>💎 <strong>Crystal Coin:</strong> +10 pts</div>
+          <div>🎁 <strong>Hidden Chest:</strong> +100 pts</div>
+          <div>🌀 <strong>Level Clear:</strong> +300 pts</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-cyan-400/30 space-y-1 text-xs sm:text-sm text-slate-300">
+        <h3 class="font-display font-bold text-cyan-300 text-base">🔒 Your voice &amp; privacy</h3>
+        <p>Speech-to-text uses your browser's speech service, which may send audio to the browser company (for example Google in Chrome). Recordings stay on this device for playback only and are never uploaded or saved. Progress and (optionally) transcripts are saved on this device only; delete them any time in Settings. The game never scores accent or pronunciation and does not give MUET bands.</p>
+        <p class="pt-1">3D scenery: Kenney Nature Kit (CC0). 3D engine: Three.js.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- PAUSE & SETTINGS MODAL                                                -->
+  <!-- ===================================================================== -->
+  <section id="modal-pause" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+    <div class="glass-panel gold-border rounded-3xl max-w-md w-full p-5 sm:p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-purple-400/30 pb-3">
+        <h2 class="font-display text-2xl font-extrabold text-amber-300">Paused &amp; Settings</h2>
+        <button id="btn-close-pause" type="button" class="crystal-btn px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div class="bg-slate-900/85 p-3 rounded-xl border border-cyan-400/40 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-cyan-300">🔊 Volume</span>
+            <span id="volume-pct-label" class="font-bold text-amber-300">100%</span>
+          </div>
+          <input id="slider-master-vol" type="range" min="10" max="100" value="100" class="w-full accent-amber-400 cursor-pointer" />
+        </div>
+        <label class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-purple-400/30 cursor-pointer">
+          <span>🎵 Background Fantasy Music &amp; Nature Ambience</span>
+          <input id="toggle-music" type="checkbox" checked class="w-5 h-5 accent-amber-400 rounded" />
+        </label>
+        <label class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-purple-400/30 cursor-pointer">
+          <span>🔔 Sound Effects</span>
+          <input id="toggle-sfx" type="checkbox" checked class="w-5 h-5 accent-amber-400 rounded" />
+        </label>
+        <label class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-amber-400/40 cursor-pointer">
+          <span>📝 Save my transcripts on this device (for my lecturer's report)</span>
+          <input id="toggle-save-transcripts" type="checkbox" checked class="w-5 h-5 accent-amber-400 rounded" />
+        </label>
+        <button id="btn-delete-progress" type="button" class="w-full text-left bg-rose-950/60 hover:bg-rose-900/70 p-3 rounded-xl border border-rose-400/40 text-rose-100 font-semibold">🗑️ Delete my progress &amp; transcripts</button>
+        <label class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-purple-400/30 cursor-pointer">
+          <span>📱 Show On-Screen Touch Controls</span>
+          <input id="toggle-touch" type="checkbox" class="w-5 h-5 accent-amber-400 rounded" />
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 gap-2 pt-2">
+        <button id="btn-pause-resume" type="button" class="crystal-btn py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-display font-extrabold">
+          ▶️ Resume Adventure
+        </button>
+        <button id="btn-pause-checkpoint" type="button" class="crystal-btn py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-display font-bold text-sm">
+          🚩 Return to Last Checkpoint &amp; Restore Hearts
+        </button>
+        <button id="btn-pause-restart" type="button" class="crystal-btn py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-display font-bold text-sm">
+          🔄 Restart Current Level
+        </button>
+        <button id="btn-pause-mainmenu" type="button" class="crystal-btn py-2.5 rounded-xl bg-rose-900/70 hover:bg-rose-800 text-rose-100 font-display font-bold text-sm">
+          🏠 Return to Main Menu
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- LEVEL COMPLETE / FINAL VICTORY RESULTS SCREEN                         -->
+  <!-- ===================================================================== -->
+  <section id="modal-results" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+    <div class="glass-panel gold-border rounded-3xl max-w-lg w-full p-5 sm:p-6 text-center space-y-4 max-h-[94vh] overflow-y-auto custom-scroll">
+      <div id="results-crown" class="text-5xl animate-bounce">🏆</div>
+      <h2 id="results-title" class="font-display text-3xl font-extrabold bg-gradient-to-r from-amber-300 via-yellow-200 to-cyan-300 bg-clip-text text-transparent">
+        World 1 Complete!
+      </h2>
+      <p id="results-subtitle" class="text-xs sm:text-sm text-purple-200">
+        You restored the Ancient Listening Crystal and activated the portal!
+      </p>
+
+      <!-- Stars Row -->
+      <div id="results-stars" class="flex items-center justify-center gap-3 text-4xl py-1">
+        <span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+
+      <!-- Metrics Breakdown -->
+      <div class="grid grid-cols-2 gap-2.5 text-left bg-slate-900/85 p-4 rounded-2xl border border-purple-400/30 text-xs sm:text-sm">
+        <div>
+          <div class="text-purple-300 text-xs">Level Score</div>
+          <div id="results-score" class="font-display font-bold text-lg text-amber-300">1,200</div>
+        </div>
+        <div>
+          <div class="text-purple-300 text-xs">Mission Stars</div>
+          <div id="results-accuracy" class="font-display font-bold text-lg text-emerald-300">100%</div>
+        </div>
+        <div>
+          <div class="text-purple-300 text-xs">Crystal Coins</div>
+          <div id="results-coins" class="font-display font-bold text-base text-white">20 / 20</div>
+        </div>
+        <div>
+          <div class="text-purple-300 text-xs">Hidden Chests</div>
+          <div id="results-chests" class="font-display font-bold text-base text-amber-200">1 / 1</div>
+        </div>
+      </div>
+
+      <!-- Lecturer report -->
+      <div class="text-left bg-slate-900/85 p-4 rounded-2xl border border-cyan-400/30 text-xs sm:text-sm space-y-2">
+        <div class="font-display font-bold text-cyan-300">📊 Speaking report</div>
+        <div id="results-skills"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <button id="btn-results-copy" type="button" class="crystal-btn py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs">📋 Copy this level's results</button>
+          <button id="btn-results-csv" type="button" class="crystal-btn py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs">⬇️ Download all results (CSV)</button>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+        <button id="btn-results-next" type="button" class="crystal-btn flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 font-display font-extrabold text-sm shadow-lg">
+          ⏭️ Next Enchanted World →
+        </button>
+        <button id="btn-results-retry" type="button" class="crystal-btn py-3 px-4 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-display font-bold text-sm">
+          🔄 Replay Level
+        </button>
+        <button id="btn-results-menu" type="button" class="crystal-btn py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-display font-bold text-sm">
+          🏠 Main Menu
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEVEL INTRO SPLASH -->
+  <div id="level-splash" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 transition-opacity duration-700" style="opacity:0">
+    <div class="cq-splash-card gold-border shadow-2xl">
+      <img id="level-splash-img" alt="Level intro" />
+      <div class="cq-splash-text"><h2 id="level-splash-title">Level 1</h2><p id="level-splash-sub"></p></div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="game-toast" class="hidden fixed bottom-6 right-6 z-40 glass-panel gold-border px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold text-amber-200 shadow-2xl transition-all"></div>
+
+  <!-- ===================================================================== -->
+  <!-- COMPLETE GAME ENGINE V2 (REALISTIC SUNLIT 3D + DUAL VOICE + HERO CAM) -->
+  <!-- ===================================================================== -->
+  <script src="js/data.js"></script>
+  <script src="js/speaking.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
