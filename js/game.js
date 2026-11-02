@@ -1064,7 +1064,7 @@
   const HERO_POSES = ['idle', 'run', 'jump', 'fall', 'listen', 'answer', 'celebrate', 'back', 'damage'];
   const ART_FILES = [];
   ['aiden', 'luna', 'rex', 'mia'].forEach(h => HERO_POSES.forEach(p => {
-    if (p === 'damage' && (h === 'luna' || h === 'mia')) return; // no damage pose on these sheets
+    // every hero now has a damage pose (Mia's: mia_damage.webp)
     ART_FILES.push(h + '_' + p);
   }));
   ['enemy_slime', 'enemy_mushroom', 'enemy_sprite',
